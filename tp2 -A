@@ -1,0 +1,28 @@
+// partA_race.c
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+volatile long long counter = 0;
+
+void* worker(void* arg){
+    long iters = *(long*)arg;
+    for(long i=0;i<iters;i++){
+        counter++; // non-atomic -> race
+    }
+    return NULL;
+}
+
+int main(int argc, char** argv){
+    long iters = (argc>1)? atol(argv[1]) : 5000000;
+    pthread_t t1, t2;
+
+    pthread_create(&t1, NULL, worker, &iters);
+    pthread_create(&t2, NULL, worker, &iters);
+
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+
+    printf("Counter final = %lld (expected = %lld)\n", counter, 2LL*iters);
+    return 0;
+}
