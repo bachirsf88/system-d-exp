@@ -1,0 +1,39 @@
+// partB_mutex.c
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+long long counter = 0;
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
+static double now_s(void){
+    struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec + ts.tv_nsec*1e-9;
+}
+
+void* worker(void* arg){
+    long iters = *(long*)arg;
+    for(long i=0;i<iters;i++){
+        pthread_mutex_lock(&lock);
+        counter++;
+        pthread_mutex_unlock(&lock);
+    }
+    return NULL;
+}
+
+int main(int argc, char** argv){
+    long iters = (argc>1)? atol(argv[1]) : 5000000;
+    double t0 = now_s();
+    pthread_t t1, t2;
+
+    pthread_create(&t1, NULL, worker, &iters);
+    pthread_create(&t2, NULL, worker, &iters);
+
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+
+    double dt = now_s() - t0;
+    printf("Counter=%lld, time=%.3fs\n", counter, dt);
+    return 0;
+}
