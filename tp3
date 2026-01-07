@@ -1,0 +1,114 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+
+
+#define BUFFER_SIZE 10
+#define N_PRODUCERS 3 
+#define N_CONSUMERS 3  
+#define ITEMS_PER_PRODUCER 10 
+#define TOTAL_ITEMS (N_PRODUCERS * ITEMS_PER_PRODUCER) 
+
+int buffer[BUFFER_SIZE];
+int in = 0;
+int out = 0;
+
+pthread_mutex_t mutex;
+sem_t empty; 
+sem_t full;  
+
+
+void *producteur(void *thread_id_ptr) {
+    long thread_id = (long)thread_id_ptr;
+    int item;
+    int i;
+    
+    printf("product #%ld work began. will produce %d element.\n", thread_id, ITEMS_PER_PRODUCER);
+
+    for (i = 1; i <= ITEMS_PER_PRODUCER; i++) {
+        item = (int)(thread_id * 100) + i; 
+
+        sem_wait(&empty);
+
+        pthread_mutex_lock(&mutex);
+
+        buffer[in] = item;
+        printf("✅ product #%ld place the element: %d in the position: %d\n", thread_id, item, in);
+        in = (in + 1) % BUFFER_SIZE;
+        // ---------------------------------
+
+        pthread_mutex_unlock(&mutex);
+
+        sem_post(&full);
+
+    }
+
+    printf("<<< product #%ld finished his work >>>\n", thread_id);
+    return NULL;
+}
+
+
+void *consommateur(void *thread_id_ptr) {
+    long thread_id = (long)thread_id_ptr;
+    int item;
+    int count = 0;
+    
+    while (count < TOTAL_ITEMS / N_CONSUMERS) { 
+        
+        sem_wait(&full);
+
+        pthread_mutex_lock(&mutex);
+
+        item = buffer[out];
+        printf("  ⬅️ consumer #%ld pull the item: %d from the position: %d\n", thread_id, item, out);
+        out = (out + 1) % BUFFER_SIZE;
+        // ---------------------------------
+
+        pthread_mutex_unlock(&mutex);
+
+        sem_post(&empty);
+        
+        count++;
+    }
+
+    printf("<<< consumer #%ld finished his work >>>\n", thread_id);
+    return NULL;
+}
+int main() {
+    pthread_t prod_threads[N_PRODUCERS];
+    pthread_t cons_threads[N_CONSUMERS];
+    long i;
+
+    if (pthread_mutex_init(&mutex, NULL) != 0) return 1;
+    if (sem_init(&empty, 0, BUFFER_SIZE) != 0) return 1;
+    if (sem_init(&full, 0, 0) != 0) return 1;
+
+    printf("Start simulation: %d prouduct : %d consumer . stock: %d. total العناصر: %d.\n", 
+           N_PRODUCERS, N_CONSUMERS, BUFFER_SIZE, TOTAL_ITEMS);
+    printf("-----------------------------------------------------------------------\n");
+
+    for (i = 0; i < N_PRODUCERS; i++) {
+        pthread_create(&prod_threads[i], NULL, producteur, (void *)i);
+    }
+
+    for (i = 0; i < N_CONSUMERS; i++) {
+        pthread_create(&cons_threads[i], NULL, consommateur, (void *)i);
+    }
+
+    for (i = 0; i < N_PRODUCERS; i++) {
+        pthread_join(prod_threads[i], NULL);
+    }
+
+    for (i = 0; i < N_CONSUMERS; i++) {
+        pthread_join(cons_threads[i], NULL);
+    }
+
+    pthread_mutex_destroy(&mutex);
+    sem_destroy(&empty);
+    sem_destroy(&full);
+
+    printf("the simulation was completed successfully.\n");
+    return 0;
+}
